@@ -27,7 +27,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
           action: "upload"
           ###### Repository/Build Configurations ######
-          app_location: "/frontend"
+          app_location: "frontend"
           api_location: ""
           output_location: "dist"
           ###### End of Repository/Build Configurations ######
