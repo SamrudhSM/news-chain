@@ -91,7 +91,7 @@ def get_causal_chain(entity_name: str, depth: int = 3):
             RETURN e, t, other, n, r1, r2, r3
         """, entity_name=entity_name)
         return [record for record in result]
-        
+
 def get_events_impacting_topic(topic_name: str):
     """
     Get all events that impact a specific topic.
@@ -147,6 +147,22 @@ def get_all_graph_data():
             })
 
         return {"nodes": nodes, "edges": edges}
+
+def get_event_graph(event_id: str):
+    """
+    Get only nodes and relationships for a specific event.
+    Max 15 nodes to keep graph clean.
+    """
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (e:Event {id: $event_id})
+            OPTIONAL MATCH (e)-[r1:INVOLVES]->(entity:Entity)
+            OPTIONAL MATCH (e)-[r2:IMPACTS]->(topic:Topic)
+            OPTIONAL MATCH (e)-[r3:CAUSES]->(effect:Event)
+            RETURN e, entity, topic, effect, r1, r2, r3
+            LIMIT 15
+        """, event_id=event_id)
+        return [record for record in result]
 
 
 if __name__ == "__main__":

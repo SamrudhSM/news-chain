@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from models.schemas import QueryRequest, QueryResponse, GraphResponse
 from agents.orchestrator import run_intelligence_pipeline
-from backend.db import get_causal_chain, get_recent_events
+from backend.db import get_causal_chain, get_recent_events, get_event_graph
 import logging
 
 app = FastAPI(title="NewsChain API", description="AI Agentic Geopolitical Graph API")
@@ -95,6 +95,19 @@ def get_entity_graph(entity: str, depth: int = 3):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/graph/event/{event_id}", response_model=GraphResponse)
+def get_event_graph_endpoint(event_id: str):
+    """
+    Get clean graph for a specific event only.
+    """
+    try:
+        records = get_event_graph(event_id)
+        graph_data = serialize_neo4j_paths(records)
+        return GraphResponse(**graph_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/feed")
 def get_feed(limit: int = 10):
     """Get recent intelligence events for the feed."""
