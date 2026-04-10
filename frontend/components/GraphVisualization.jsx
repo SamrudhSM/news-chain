@@ -1,1 +1,0 @@
-const limitedNodes = data.nodes.slice(0, 15);
