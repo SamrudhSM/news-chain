@@ -2,12 +2,29 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
 from models.schemas import QueryRequest, QueryResponse, GraphResponse
 from agents.orchestrator import run_intelligence_pipeline
 from backend.db import get_causal_chain, get_recent_events, get_event_graph
 import logging
+
+security = HTTPBearer()
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    token = credentials.credentials
+    if not SUPABASE_JWT_SECRET:
+        # If secret not set yet in dev, just decode without verification to keep moving
+        payload = jwt.decode(token, options={"verify_signature": False})
+        return payload.get("sub", "")
+    try:
+        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+        return payload.get("sub")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
 
 app = FastAPI(title="NewsChain API", description="AI Agentic Geopolitical Graph API")
 
@@ -26,13 +43,13 @@ def health_check():
 
 
 @app.post("/query", response_model=QueryResponse)
-def run_query(req: QueryRequest):
+def run_query(req: QueryRequest, user_id: str = Depends(get_current_user)):
     """
     Run a full intelligence pipeline: fetch news, analyze it, and optionally save to graph.
     """
     try:
-        logging.info(f"Running pipeline with query: {req.query}, dry_run={req.dry_run}")
-        final_state = run_intelligence_pipeline(req.query, dry_run=req.dry_run)
+        logging.info(f"Running pipeline with query: {req.query}, dry_run={req.dry_run}, user={user_id}")
+        final_state = run_intelligence_pipeline(req.query, user_id=user_id, dry_run=req.dry_run)
         
         return QueryResponse(
             query=final_state.get("query", ""),
@@ -83,12 +100,12 @@ def serialize_neo4j_paths(records) -> dict:
 
 
 @app.get("/graph/{entity}", response_model=GraphResponse)
-def get_entity_graph(entity: str, depth: int = 3):
+def get_entity_graph(entity: str, depth: int = 3, user_id: str = Depends(get_current_user)):
     """
     Get the causal chain / graph for a specific entity.
     """
     try:
-        paths = get_causal_chain(entity, depth=depth)
+        paths = get_causal_chain(entity, depth=depth, user_id=user_id)
         graph_data = serialize_neo4j_paths(paths)
         return GraphResponse(**graph_data)
     except Exception as e:
@@ -97,22 +114,22 @@ def get_entity_graph(entity: str, depth: int = 3):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/graph/event/{event_id}", response_model=GraphResponse)
-def get_event_graph_endpoint(event_id: str):
+def get_event_graph_endpoint(event_id: str, user_id: str = Depends(get_current_user)):
     """
     Get clean graph for a specific event only.
     """
     try:
-        records = get_event_graph(event_id)
+        records = get_event_graph(event_id, user_id=user_id)
         graph_data = serialize_neo4j_paths(records)
         return GraphResponse(**graph_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/feed")
-def get_feed(limit: int = 10):
+def get_feed(limit: int = 10, user_id: str = Depends(get_current_user)):
     """Get recent intelligence events for the feed."""
     try:
-        events = get_recent_events(limit=limit)
+        events = get_recent_events(limit=limit, user_id=user_id)
         return {"events": events, "total": len(events)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

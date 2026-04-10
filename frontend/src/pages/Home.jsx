@@ -14,7 +14,7 @@ const LOADING_PHASES = [
   "Finalizing Output..."
 ];
 
-export default function Home() {
+export default function Home({ session }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState(0);
   const [activeTab, setActiveTab] = useState('brief'); // 'brief' | 'graph'
@@ -41,8 +41,14 @@ export default function Home() {
     setActiveTab('brief'); // Reset tab on new search
     
     try {
+      const config = {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      };
+
       // 1. Run Pipeline
-      const { data } = await axios.post(`${API_BASE_URL}/query`, { query: query, dry_run: false });
+      const { data } = await axios.post(`${API_BASE_URL}/query`, { query: query, dry_run: false }, config);
       setResult(data);
       
       // 2. Fetch Graph
@@ -51,7 +57,7 @@ export default function Home() {
         try {
           // Give Neo4j a brief moment
           await new Promise(r => setTimeout(r, 1000));
-          const graphRes = await axios.get(`${API_BASE_URL}/graph/event/${encodeURIComponent(eventId)}`);
+          const graphRes = await axios.get(`${API_BASE_URL}/graph/event/${encodeURIComponent(eventId)}`, config);
           setGraphData(graphRes.data);
         } catch (err) {
           console.error("Graph fetch error:", err);

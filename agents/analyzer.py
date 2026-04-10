@@ -98,7 +98,7 @@ Always respond with valid JSON only. No markdown, no extra text.
         return {}
 
 
-def save_brief_to_neo4j(brief: dict):
+def save_brief_to_neo4j(brief: dict, user_id: str):
     """Save intelligence brief to Neo4j graph."""
     if not brief:
         print("[AnalysisAgent] Empty brief, skipping Neo4j save.")
@@ -108,17 +108,17 @@ def save_brief_to_neo4j(brief: dict):
 
     event = brief.get("event", {})
     if event:
-        create_event(event)
+        create_event(event, user_id=user_id)
 
     for entity in brief.get("entities", []):
-        create_entity(entity["name"], entity["type"])
+        create_entity(entity["name"], entity["type"], user_id=user_id)
         if event.get("id"):
-            link_event_involves_entity(event["id"], entity["name"])
+            link_event_involves_entity(event["id"], entity["name"], user_id=user_id)
 
     for topic in brief.get("topics_impacted", []):
-        create_topic(topic["name"])
+        create_topic(topic["name"], user_id=user_id)
         if event.get("id"):
-            link_event_impacts_topic(event["id"], topic["name"], topic["impact"])
+            link_event_impacts_topic(event["id"], topic["name"], topic["impact"], user_id=user_id)
 
     causal_chain = brief.get("causal_chain", [])
     for i, link in enumerate(causal_chain):
@@ -132,7 +132,7 @@ def save_brief_to_neo4j(brief: dict):
             "category": "causal",
             "date": event.get("date", ""),
             "risk_score": 0
-        })
+        }, user_id=user_id)
         create_event({
             "id": to_id,
             "title": link.get("to_event", ""),
@@ -140,20 +140,21 @@ def save_brief_to_neo4j(brief: dict):
             "category": "causal",
             "date": event.get("date", ""),
             "risk_score": 0
-        })
+        }, user_id=user_id)
         link_event_causes_event(
             from_id, to_id,
             confidence=link.get("confidence", 0.5),
-            explanation=link.get("explanation", "")
+            explanation=link.get("explanation", ""),
+            user_id=user_id
         )
 
     print("[AnalysisAgent] Saved to Neo4j successfully.")
 
 
-def analyze_and_save(articles: list, user_query: str) -> dict:
+def analyze_and_save(articles: list, user_query: str, user_id: str) -> dict:
     """Full pipeline: analyze → save to Neo4j → return brief."""
     brief = analyze_articles(articles, user_query)
-    save_brief_to_neo4j(brief)
+    save_brief_to_neo4j(brief, user_id)
     return brief
 
 

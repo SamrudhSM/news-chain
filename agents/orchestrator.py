@@ -15,6 +15,7 @@ class AgentState(TypedDict):
     articles: List[dict]
     brief: dict
     dry_run: bool
+    user_id: str
 
 # 2. Define the Nodes (Agent Functions)
 def fetch_news_node(state: AgentState):
@@ -39,7 +40,7 @@ def save_to_graph_node(state: AgentState):
     print(f"\n[Orchestrator] Node 3: Saving insights to Neo4j database...")
     brief = state.get("brief", {})
     if brief:
-        save_brief_to_neo4j(brief)
+        save_brief_to_neo4j(brief, user_id=state.get("user_id"))
     return {}
 
 # 3. Create the StateGraph Builder
@@ -75,12 +76,13 @@ workflow.add_edge("graph_saver", END)
 orchestrator_app = workflow.compile()
 
 
-def run_intelligence_pipeline(user_query: str, dry_run: bool = False) -> dict:
+def run_intelligence_pipeline(user_query: str, user_id: str, dry_run: bool = False) -> dict:
     """
     Main entry point to run the intelligence pipeline.
     
     Args:
         user_query (str): The high-level topic to research and map out.
+        user_id (str): The ID of the authenticated user to scope the graph data.
         dry_run (bool): If True, it will skip saving nodes to Neo4j (helpful for testing).
         
     Returns:
@@ -96,7 +98,8 @@ def run_intelligence_pipeline(user_query: str, dry_run: bool = False) -> dict:
         "query": user_query,
         "articles": [],
         "brief": {},
-        "dry_run": dry_run
+        "dry_run": dry_run,
+        "user_id": user_id
     }
     
     # Invoke the LangGraph pipeline
@@ -114,7 +117,7 @@ if __name__ == "__main__":
     
     # Set dry_run=True so we don't immediately push random test events to the Neo4j database
     final_result = run_intelligence_pipeline(test_q, dry_run=False)
-    
+        
     print("\nExtracted Intelligence Brief:")
     import json
     print(json.dumps(final_result.get("brief", {}), indent=2))
