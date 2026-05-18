@@ -4,7 +4,7 @@ import SearchBar from '../components/SearchBar';
 import BriefCard from '../components/BriefCard';
 import GraphVisualization from '../components/GraphVisualization';
 
-const API_BASE_URL = 'https://newschain-backend.agreeablesmoke-eff19f0c.centralindia.azurecontainerapps.io';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const LOADING_PHASES = [
   "Fetching news streams...",
